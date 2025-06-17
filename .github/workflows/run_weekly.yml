@@ -3,7 +3,7 @@ name: Update Tranco Unique Domains List
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/20 * * * *'
+    - cron: '35 6 * * *'
   workflow_call:
 
 jobs:
@@ -78,7 +78,7 @@ jobs:
         # If there are any staged changes, commit and push
         if ! git diff --cached --quiet; then
           DATE_UTC=$(date -u +'%Y-%m-%d')
-          COMMIT_MSG="chore: update uniques ${DATE_UTC} (+${ADDED}, -${REMOVED}, total ${TOTAL})"
+          COMMIT_MSG="chore: update uniques ${DATE_UTC} (+${ADDED}, total ${TOTAL})"
           
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
