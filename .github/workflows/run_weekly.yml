@@ -36,7 +36,7 @@ jobs:
       run: |
         YEAR=$(date -u +'%Y')
         NEW_TXT_FILE="./data/tranco_unique_domains_${YEAR}.txt"
-        NEW_GZ_FILE="./data/${NEW_TXT_FILE}.gz"
+        NEW_GZ_FILE="${NEW_TXT_FILE}.gz"
         CURRENT_GZ_FILE="./data/current.txt.gz"
         OLD_TXT_FILE="./data/tranco_old_temp.txt"
 
