@@ -2,22 +2,22 @@
 """
 download-tranco-1m-for-year.py
 ---------------------------------------------------------------
-Fetch daily **Tranco Top-1 M** lists *in parallel* between two dates
+Fetch daily **Tranco Top‑1 M** lists *in parallel* between two dates
 (inclusive) and write **one file containing every unique domain** seen
-in that span.
+in that span. The resulting file is saved to **./data/** by default.
 
 Default behaviour (no flags)
 ---------------------------
 * `--end`   → **today**  (system date)
 * `--start` → **January 1 of that same year**
-* `--outfile` → `tranco_unique_domains_<YEAR>.txt` (e.g. `unique_domains_2025.txt`)
+* `--outfile` → `./data/tranco_unique_domains_<YEAR>.txt` (e.g. `./data/tranco_unique_domains_2025.txt`)
 
 Examples
 --------
-# Current calendar year-to-date (Jan 1 -> today), 8 workers
+# Current calendar year‑to‑date (Jan 1 → today), 8 workers
 $ python download-tranco-1m-for-year.py
 
-# Full calendar year 2024, 12 workers, custom file name
+# Full calendar year 2024, 12 workers, custom file name (saved under ./data/)
 $ python download-tranco-1m-for-year.py \
       --start 2024-01-01 --end 2024-12-31 \
       --workers 12 --outfile all_unique_2024.txt
@@ -44,13 +44,13 @@ from tqdm import tqdm       # pip install tqdm
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Download Tranco daily Top-1st M lists, dedupe globally, and write one file of unique domains.")
+        description="Download Tranco daily Top‑1 M lists, dedupe globally, and write one file of unique domains (saved in ./data/ by default)." )
     parser.add_argument("--start", "-s",
                         help="Start date YYYY-MM-DD (inclusive). Default: Jan 1 of --end's year.")
     parser.add_argument("--end", "-e",
                         help="End date YYYY-MM-DD (inclusive). Default: today.")
     parser.add_argument("--outfile", "-o",
-                        help="Output file path. Default: tranco_unique_domains_<YEAR>.txt if single year, else tranco_unique_domains_<start>_<end>.txt")
+                        help="Output file path (relative paths are placed in ./data/). Default: tranco_unique_domains_<YEAR>.txt if single year, else tranco_unique_domains_<start>_<end>.txt")
     parser.add_argument("--workers", "-w", type=int, default=None,
                         help="Parallel workers (default 8 or env TR_DOWNLOAD_WORKERS)")
     return parser.parse_args()
@@ -95,7 +95,7 @@ def main():
     if start_dt > end_dt:
         sys.exit("Error: start date must be earlier than or equal to end date")
 
-    # Determine output file path
+    # Determine output file path (relative paths will be rooted under ./data/)
     if args.outfile:
         outfile = args.outfile
     else:
@@ -103,6 +103,10 @@ def main():
             outfile = f"tranco_unique_domains_{start_dt.year}.txt"
         else:
             outfile = f"tranco_unique_domains_{start_dt}_{end_dt}.txt"
+
+    # If the user‑supplied or generated path is not absolute, place it in ./data/
+    if not os.path.isabs(outfile):
+        outfile = os.path.join("data", outfile)
 
     # Worker count
     workers = args.workers or int(os.getenv("TR_DOWNLOAD_WORKERS", "8"))
@@ -136,7 +140,7 @@ def main():
             fut.result()  # already handled in fetch_one
             bar.update(1)
 
-    # Write sorted result
+    # Ensure output directory exists and write sorted result
     os.makedirs(os.path.dirname(outfile) or ".", exist_ok=True)
     with open(outfile, "w", encoding="utf-8") as fh:
         for domain in sorted(uniques):
