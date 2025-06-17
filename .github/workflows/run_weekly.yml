@@ -30,7 +30,7 @@ jobs:
 
     - name: Run downloader
       run: |
-        python3 download-tranco-1m-for-year.py ./data/
+        python3 download-tranco-1m-for-year.py
 
     - name: Diff, compress, copy, and commit if changed
       run: |
