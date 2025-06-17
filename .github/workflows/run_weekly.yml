@@ -1,0 +1,100 @@
+name: Update Tranco Unique Domains List
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_call:
+
+jobs:
+  tranco:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write          # allow pushing to the repo
+
+    steps:
+    - name: Check out repo
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0         # keep full history for commits
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install deps
+      run: |
+        python -m pip install --upgrade pip
+        pip install tranco tqdm
+
+    - name: Run downloader
+      run: |
+        python3 download-tranco-1m-for-year.py ./data/
+
+    - name: Diff, compress, copy, and commit if changed
+      run: |
+        YEAR=$(date -u +'%Y')
+        NEW_TXT_FILE="./data/tranco_unique_domains_${YEAR}.txt"
+        NEW_GZ_FILE="./data/${NEW_TXT_FILE}.gz"
+        CURRENT_GZ_FILE="./data/current.txt.gz"
+        OLD_TXT_FILE="./data/tranco_old_temp.txt"
+
+        # Exit if the python script didn't generate a file
+        if [ ! -f "$NEW_TXT_FILE" ]; then
+          echo "Source file $NEW_TXT_FILE not found. Nothing to do."
+          exit 0
+        fi
+
+        # Initialize stats
+        ADDED=0
+        REMOVED=0
+        TOTAL=$(wc -l < "$NEW_TXT_FILE")
+
+        # If a 'current' file exists from a previous run, decompress it to calculate a precise diff
+        if [ -f "$CURRENT_GZ_FILE" ]; then
+          echo "Found existing list. Calculating diff against previous version..."
+          gunzip -c "$CURRENT_GZ_FILE" > "$OLD_TXT_FILE"
+          
+          # Calculate added and removed lines by comparing old and new text files
+          # The output of --numstat is in the format: "ADDED  REMOVED  FILENAME"
+          read ADDED REMOVED <<< $(git diff --no-index --numstat "$OLD_TXT_FILE" "$NEW_TXT_FILE" | awk '{print $1, $2}')
+
+          rm "$OLD_TXT_FILE" # Clean up the temporary file
+        else
+          # If no 'current' file exists, this is the first run. All lines are new.
+          echo "No existing list found. Treating all lines as new additions."
+          ADDED=$TOTAL
+          REMOVED=0
+        fi
+        
+        # Compress the new list and create the 'current' copy
+        gzip -f "$NEW_TXT_FILE"
+        cp "$NEW_GZ_FILE" "$CURRENT_GZ_FILE"
+
+        # Stage both of the .gz files
+        git add "$NEW_GZ_FILE" "$CURRENT_GZ_FILE"
+
+        # If there are any staged changes, commit and push
+        if ! git diff --cached --quiet; then
+          DATE_UTC=$(date -u +'%Y-%m-%d')
+          COMMIT_MSG="chore: update uniques ${DATE_UTC} (+${ADDED}, -${REMOVED}, total ${TOTAL})"
+          
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "$COMMIT_MSG"
+          git push
+        else
+          echo "No changes detected in compressed files - skip commit."
+        fi
+        
+  # ─────────────────────────────────────────────────────────────
+  # Keep-alive job: prevents auto-disable after 60 days
+  # ─────────────────────────────────────────────────────────────
+  workflow-keepalive:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - uses: liskin/gh-workflow-keepalive@v1
